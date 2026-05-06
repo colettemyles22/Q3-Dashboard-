@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Q3 2026 Task Completion Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #1d1d1f; }
+
+    header { background: linear-gradient(135deg, #1d1d1f, #3a3a3c); color: white; padding: 28px 40px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+    header h1 { font-size: 1.6rem; font-weight: 700; }
+    header p  { font-size: 0.85rem; opacity: 0.65; margin-top: 4px; }
+    .header-actions { display: flex; gap: 10px; }
+    .btn { padding: 8px 18px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.2s; }
+    .btn:hover { opacity: 0.85; }
+    .btn-white  { background: white; color: #1d1d1f; }
+    .btn-blue   { background: #5e81f4; color: white; }
+    .btn-green  { background: #34c759; color: white; }
+    .btn-orange { background: #f4a25e; color: white; }
+    .btn-red    { background: #ff3b30; color: white; }
+    .btn-sm     { padding: 4px 10px; font-size: 0.75rem; }
+
+    .tabs { display: flex; background: white; border-bottom: 1px solid #e5e5ea; padding: 0 40px; }
+    .tab { padding: 14px 22px; font-size: 0.9rem; font-weight: 500; cursor: pointer; border-bottom: 3px solid transparent; color: #6e6e73; transition: all 0.2s; }
+    .tab.active { color: #5e81f4; border-bottom-color: #5e81f4; font-weight: 600; }
+    .tab:hover { color: #1d1d1f; }
+
+    .view { display: none; padding: 28px 40px 40px; }
+    .view.active { display: block; }
+
+    /* KPIs */
+    .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 24px; }
+    .kpi { background: white; border-radius: 14px; padding: 18px 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); text-align: center; }
+    .kpi .val { font-size: 2.2rem; font-weight: 700; line-height: 1; }
+    .kpi .lbl { font-size: 0.72rem; color: #6e6e73; margin-top: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .kpi.c .val { color: #5e81f4; }
+    .kpi.m .val { color: #f4a25e; }
+    .kpi.g .val { color: #34c759; }
+
+    /* Charts */
+    .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(440px, 1fr)); gap: 18px; }
+    .chart-card { background: white; border-radius: 14px; padding: 22px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+    .chart-card.full-width { grid-column: 1 / -1; }
+    .chart-card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 3px; }
+    .chart-card p  { font-size: 0.78rem; color: #6e6e73; margin-bottom: 16px; }
+
+    /* Controls */
+    .tracker-controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 20px; }
+    .tracker-controls label { font-size: 0.85rem; color: #6e6e73; font-weight: 500; }
+    select { background: white; border: 1px solid #d1d1d6; border-radius: 8px; padding: 7px 12px; font-size: 0.85rem; cursor: pointer; outline: none; color: #1d1d1f; }
+
+    /* Advisor cards */
+    .advisor-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; }
+    .advisor-card { background: white; border-radius: 14px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+    .advisor-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .advisor-name { font-size: 1rem; font-weight: 700; }
+    .advisor-badge { font-size: 0.72rem; font-weight: 600; padding: 3px 10px; border-radius: 20px; background: #f0f2f5; color: #6e6e73; }
+    .advisor-badge.complete { background: #d1fae5; color: #065f46; }
+    .advisor-badge.partial  { background: #fef3c7; color: #92400e; }
+
+    .task-block { border-radius: 10px; margin-bottom: 10px; background: #f9f9fb; overflow: hidden; }
+    .task-block.done { background: #f0fdf4; }
+    .task-main { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; cursor: pointer; user-select: none; transition: background 0.15s; }
+    .task-main:hover { background: rgba(0,0,0,0.03); }
+    .task-left { display: flex; align-items: center; gap: 10px; }
+    .task-icon { font-size: 1.1rem; }
+    .task-info .task-name { font-size: 0.88rem; font-weight: 600; }
+    .task-info .task-mgr  { font-size: 0.75rem; color: #6e6e73; margin-top: 1px; }
+    .task-toggle { width: 26px; height: 26px; border-radius: 50%; border: 2px solid #d1d1d6; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; transition: all 0.2s; flex-shrink: 0; background: white; }
+    .task-block.done .task-toggle { background: #34c759; border-color: #34c759; color: white; }
+
+    .task-meta { display: flex; gap: 8px; padding: 0 12px 10px; flex-wrap: wrap; }
+    .meta-field { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 120px; }
+    .meta-field label { font-size: 0.68rem; color: #6e6e73; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; }
+    .meta-input { font-size: 0.78rem; border: 1px solid #d1d1d6; border-radius: 6px; padding: 5px 8px; color: #1d1d1f; background: white; outline: none; width: 100%; font-family: inherit; }
+    .meta-input:focus { border-color: #5e81f4; }
+    .meta-input[type="date"] { color: #1d1d1f; }
+    .meta-notes { resize: none; min-height: 36px; }
+    .meta-campaign { background: #fffbeb; border-color: #fcd34d; }
+    .meta-campaign:focus { border-color: #f59e0b; }
+
+    .live-tasks-section { padding: 0 12px 12px; }
+    .live-tasks-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .live-tasks-title { font-size: 0.78rem; font-weight: 700; color: #5e81f4; }
+    .live-tasks-count { font-size: 0.72rem; color: #6e6e73; margin-left: 6px; }
+
+    .live-task-item { background: #f0f4ff; border: 1px solid #c7d3fc; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; }
+    .live-task-item:last-child { margin-bottom: 0; }
+    .live-task-item-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .live-task-num { font-size: 0.72rem; font-weight: 700; color: #3a5bd9; background: #c7d3fc; padding: 2px 8px; border-radius: 20px; }
+    .live-task-remove { background: none; border: none; color: #ef4444; cursor: pointer; font-size: 0.8rem; padding: 2px 6px; border-radius: 4px; }
+    .live-task-remove:hover { background: #fee2e2; }
+    .live-task-fields { display: flex; gap: 8px; flex-wrap: wrap; }
+    .live-task-field { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 120px; }
+    .live-task-field label { font-size: 0.68rem; color: #3a5bd9; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; }
+    .live-task-input { font-size: 0.78rem; border: 1px solid #c7d3fc; border-radius: 6px; padding: 5px 8px; color: #1d1d1f; background: white; outline: none; width: 100%; font-family: inherit; }
+    .live-task-input:focus { border-color: #5e81f4; }
+    .live-task-notes { resize: none; min-height: 32px; }
+
+    .advisor-progress { margin-top: 12px; }
+    .prog-label { display: flex; justify-content: space-between; font-size: 0.75rem; color: #6e6e73; margin-bottom: 5px; }
+    .prog-bar   { background: #f0f0f0; border-radius: 99px; height: 6px; overflow: hidden; }
+    .prog-fill  { height: 100%; border-radius: 99px; background: linear-gradient(90deg,#5e81f4,#34c759); transition: width 0.4s ease; }
+
+    /* ── EVAL TABLE ── */
+    .eval-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .eval-table th {
+      background: #f5f5f7; padding: 10px 14px; text-align: left;
+      font-weight: 600; color: #6e6e73; font-size: 0.75rem;
+      text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 1px solid #e5e5ea;
+    }
+    .eval-table th.center, .eval-table td.center { text-align: center; }
+    .eval-table td { padding: 10px 14px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+    .eval-table tr:last-child td { border-bottom: none; }
+    .eval-table tr:hover td { background: #fafafa; }
+    .eval-table tfoot td { background: #f5f5f7; font-weight: 700; border-top: 2px solid #e5e5ea; }
+
+    .task-pill {
+      display: inline-block; background: #f0f4ff; border: 1px solid #c7d3fc;
+      border-radius: 6px; padding: 2px 8px; font-size: 0.75rem; color: #3a5bd9;
+      margin: 2px 2px 2px 0;
+    }
+    .task-pill.empty { background: #f5f5f7; border-color: #e5e5ea; color: #aaa; font-style: italic; }
+
+    .count-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 28px; height: 28px; border-radius: 50%;
+      font-weight: 700; font-size: 0.85rem;
+    }
+    .count-badge.colette  { background: #e8edff; color: #3a5bd9; }
+    .count-badge.paul     { background: #fff3e8; color: #c2610a; }
+    .count-badge.zero     { background: #f5f5f7; color: #aaa; }
+
+    .month-group-header td {
+      background: #1d1d1f; color: white; font-weight: 700;
+      font-size: 0.8rem; padding: 8px 14px; letter-spacing: 0.5px;
+    }
+
+    /* Sync */
+    .sync-panel { background: white; border-radius: 14px; padding: 28px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); max-width: 700px; margin: 0 auto; }
+    .sync-panel h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 6px; }
+    .sync-panel .subtitle { font-size: 0.85rem; color: #6e6e73; margin-bottom: 24px; }
+    .sync-section { margin-bottom: 28px; }
+    .sync-section h3 { font-size: 0.9rem; font-weight: 600; margin-bottom: 10px; }
+    .code-box { background: #f5f5f7; border-radius: 10px; padding: 14px 16px; font-family: monospace; font-size: 0.78rem; word-break: break-all; line-height: 1.6; max-height: 120px; overflow-y: auto; border: 1px solid #e5e5ea; }
+    .sync-actions { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+    textarea.paste-box { width: 100%; min-height: 100px; border-radius: 10px; border: 1px solid #d1d1d6; padding: 12px; font-family: monospace; font-size: 0.78rem; resize: vertical; outline: none; color: #1d1d1f; background: #fafafa; }
+    textarea.paste-box:focus { border-color: #5e81f4; }
+    .how-it-works { background: #f0f4ff; border-radius: 12px; padding: 16px 20px; margin-bottom: 28px; }
+    .how-it-works h3 { font-size: 0.9rem; font-weight: 600; color: #3a5bd9; margin-bottom: 10px; }
+    .how-it-works ol { padding-left: 18px; }
+    .how-it-works li { font-size: 0.83rem; color: #3a5bd9; margin-bottom: 6px; line-height: 1.5; }
+    .alert { padding: 12px 16px; border-radius: 10px; font-size: 0.85rem; font-weight: 500; margin-top: 10px; display: none; }
+    .alert.success { background: #d1fae5; color: #065f46; display: block; }
+    .alert.error   { background: #fee2e2; color: #991b1b; display: block; }
+
+    .save-banner { position: fixed; bottom: 20px; right: 20px; background: #1d1d1f; color: white; padding: 12px 20px; border-radius: 12px; font-size: 0.85rem; font-weight: 500; box-shadow: 0 4px 20px rgba(0,0,0,0.2); opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 999; }
+    .save-banner.show { opacity: 1; }
+
+    .who-bar { background: #f0f4ff; border-bottom: 1px solid #d0d8ff; padding: 10px 40px; display: flex; align-items: center; gap: 12px; font-size: 0.85rem; }
+    .who-select { background: white; border: 1px solid #c0caff; border-radius: 8px; padding: 5px 10px; font-size: 0.85rem; color: #1d1d1f; outline: none; cursor: pointer; }
+
+    @media (max-width: 640px) {
+      header, .view, .who-bar { padding: 16px; }
+      .tabs { padding: 0 16px; }
+      .charts-grid, .advisor-cards { grid-template-columns: 1fr; }
+      .task-meta, .live-task-fields { flex-direction: column; }
+      .chart-card.full-width { grid-column: 1; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>📊 Q3 2026 Task Completion</h1>
+    <p>1 Live Session (2–5 tasks) + 1 Campaign Northstar · per advisor · per month</p>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-red" onclick="resetData()">🗑 Reset My Data</button>
+  </div>
+</header>
+
+<div class="who-bar">
+  👤 You are viewing as:
+  <select class="who-select" id="whoAmI" onchange="onWhoChange()">
+    <option value="Colette">Colette</option>
+    <option value="Paul Palmer">Paul Palmer</option>
+  </select>
+  <span style="color:#6e6e73;font-size:0.8rem;">— your ticks are saved separately per manager</span>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('tracker')">✏️ Tracker</div>
+  <div class="tab"        onclick="switchTab('dashboard')">📊 Dashboard</div>
+  <div class="tab"        onclick="switchTab('sync')">🔄 Sync</div>
+</div>
+
+<!-- TRACKER -->
+<div id="view-tracker" class="view active">
+  <div class="tracker-controls">
+    <label>Month</label>
+    <select id="trackerMonth" onchange="renderTracker()">
+      <option value="May 2026">May 2026</option>
+      <option value="June 2026">June 2026</option>
+      <option value="July 2026">July 2026</option>
+    </select>
+  </div>
+  <div class="advisor-cards" id="advisorCards"></div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="view-dashboard" class="view">
+  <div class="tracker-controls">
+    <label>Month</label>
+    <select id="dashMonth" onchange="renderDashboard()">
+      <option value="all">All Q3</option>
+      <option value="May 2026">May 2026</option>
+      <option value="June 2026">June 2026</option>
+      <option value="July 2026">July 2026</option>
+    </select>
+    <label>Manager</label>
+    <select id="dashManager" onchange="renderDashboard()">
+      <option value="all">Both</option>
+      <option value="Colette">Colette</option>
+      <option value="Paul Palmer">Paul Palmer</option>
+    </select>
+  </div>
+  <div class="kpi-row" id="kpiRow"></div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h3>📅 Monthly Completion</h3>
+      <p>Live Sessions &amp; Campaign Northstars completed vs 8-advisor target</p>
+      <canvas id="monthlyBar" height="240"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>✅ By Task Type</h3>
+      <p>Live Sessions vs Campaign Northstars per manager</p>
+      <canvas id="taskChart" height="240"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>📈 Completion Rate Trend</h3>
+      <p>% completion across May, June &amp; July</p>
+      <canvas id="trendChart" height="240"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>🥧 Overall Split</h3>
+      <p>Completed vs pending by task type</p>
+      <canvas id="pieChart" height="240"></canvas>
+    </div>
+    <!-- TASK EVALUATIONS TABLE -->
+    <div class="chart-card full-width">
+      <h3>📋 Task Evaluations Completed During Live Sessions</h3>
+      <p>Only tasks with a name entered are counted — grouped by month and advisor</p>
+      <div id="evalTableWrap"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SYNC -->
+<div id="view-sync" class="view">
+  <div class="sync-panel">
+    <h2>🔄 Sync with Paul Palmer</h2>
+    <p class="subtitle">Share your progress code with Paul — paste his in to combine on the dashboard.</p>
+    <div class="how-it-works">
+      <h3>💡 How it works</h3>
+      <ol>
+        <li>Each manager opens this HTML file on their own computer</li>
+        <li>Tick off your completed tasks in the <strong>Tracker</strong> tab</li>
+        <li>Come to this <strong>Sync</strong> tab and copy your code</li>
+        <li>Send it to Paul (email, Slack, iMessage — anything!)</li>
+        <li>He pastes your code into the <strong>"Paste their code"</strong> box and clicks Merge</li>
+        <li>The <strong>Dashboard</strong> now shows both managers' combined data ✅</li>
+      </ol>
+    </div>
+    <div class="sync-section">
+      <h3>📤 Step 1 — Copy your code</h3>
+      <div class="code-box" id="myCodeBox">Click "Generate My Code" to create your sync code</div>
+      <div class="sync-actions">
+        <button class="btn btn-blue" onclick="generateCode()">⚙️ Generate My Code</button>
+        <button class="btn btn-white" onclick="copyCode()">📋 Copy to Clipboard</button>
+      </div>
+      <div class="alert" id="copyAlert"></div>
+    </div>
+    <div class="sync-section">
+      <h3>📥 Step 2 — Paste their code &amp; merge</h3>
+      <textarea class="paste-box" id="pasteBox" placeholder="Paste Paul's sync code here..."></textarea>
+      <div class="sync-actions">
+        <button class="btn btn-green" onclick="mergeCode()">🔀 Merge &amp; Update Dashboard</button>
+        <button class="btn btn-white" onclick="document.getElementById('pasteBox').value=''">✕ Clear</button>
+      </div>
+      <div class="alert" id="mergeAlert"></div>
+    </div>
+    <div class="sync-section">
+      <h3>⬇️ Step 3 — Export combined data (optional)</h3>
+      <p style="font-size:0.82rem;color:#6e6e73;margin-bottom:10px;">Download a CSV of all merged data for your records.</p>
+      <button class="btn btn-orange" onclick="exportCSV()">⬇️ Download Combined CSV</button>
+    </div>
+  </div>
+</div>
+
+<div class="save-banner" id="saveBanner">✅ Saved!</div>
+
+<script>
+const MONTHS    = ["May 2026","June 2026","July 2026"];
+const ADVISORS  = ["Marta Symczuk","Aaron Molloy","Jerome Troy","Jim McCarthy","John Mullaney","Kevin O'Keeffe","Sharon Dwyer","Jackie O'Donovan"];
+const MANAGERS  = ["Colette","Paul Palmer"];
+const TASKS     = ["Live Session","Campaign Northstar"];
+const STORE_KEY = "q3_2026_data";
+const MAX_TASKS = 5;
+const MIN_TASKS = 2;
+
+let data = {};
+
+function makeKey(advisor, manager, task, month) {
+  return [advisor, manager, task, month].join("||");
+}
+function emptyLiveSession() {
+  return { completed:false, date:"", notes:"", tasks:[{name:"",notes:""},{name:"",notes:""}] };
+}
+function emptyCampaign() {
+  return { completed:false, date:"", campaignName:"", notes:"" };
+}
+
+function initData() {
+  const saved = localStorage.getItem(STORE_KEY);
+  if (saved) { try { data = JSON.parse(saved); } catch(e) { data={}; } }
+  for (const m of MONTHS) for (const a of ADVISORS) for (const mg of MANAGERS) {
+    const lk = makeKey(a,mg,"Live Session",m);
+    const ck = makeKey(a,mg,"Campaign Northstar",m);
+    if (!data[lk]) data[lk] = emptyLiveSession();
+    if (!data[lk].tasks) data[lk].tasks = [{name:"",notes:""},{name:"",notes:""}];
+    if (data[lk].date  === undefined) data[lk].date  = "";
+    if (data[lk].notes === undefined) data[lk].notes = "";
+    if (!data[ck]) data[ck] = emptyCampaign();
+    if (data[ck].date         === undefined) data[ck].date         = "";
+    if (data[ck].notes        === undefined) data[ck].notes        = "";
+    if (data[ck].campaignName === undefined) data[ck].campaignName = "";
+  }
+}
+
+function saveData() {
+  localStorage.setItem(STORE_KEY, JSON.stringify(data));
+  const b = document.getElementById("saveBanner");
+  b.classList.add("show");
+  setTimeout(() => b.classList.remove("show"), 1800);
+}
+
+function resetData() {
+  const who = document.getElementById("whoAmI").value;
+  if (!confirm(`Reset all data for ${who}? This cannot be undone.`)) return;
+  for (const m of MONTHS) for (const a of ADVISORS) {
+    data[makeKey(a,who,"Live Session",m)]       = emptyLiveSession();
+    data[makeKey(a,who,"Campaign Northstar",m)] = emptyCampaign();
+  }
+  saveData(); renderTracker(); renderDashboard();
+}
+
+function currentManager() { return document.getElementById("whoAmI").value; }
+function onWhoChange() { renderTracker(); }
+
+function switchTab(tab) {
+  const names = ["tracker","dashboard","sync"];
+  document.querySelectorAll(".tab").forEach((t,i) => t.classList.toggle("active", names[i]===tab));
+  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+  document.getElementById(`view-${tab}`).classList.add("active");
+  if (tab === "dashboard") renderDashboard();
+}
+
+// ── TRACKER ──────────────────────────────────────────────────────────────────
+function renderTracker() {
+  const month   = document.getElementById("trackerMonth").value;
+  const manager = currentManager();
+  const container = document.getElementById("advisorCards");
+  container.innerHTML = "";
+
+  for (const advisor of ADVISORS) {
+    const lk      = makeKey(advisor,manager,"Live Session",month);
+    const ck      = makeKey(advisor,manager,"Campaign Northstar",month);
+    const lRecord = data[lk] || emptyLiveSession();
+    const cRecord = data[ck] || emptyCampaign();
+    const lSafe   = btoa(unescape(encodeURIComponent(lk)));
+    const cSafe   = btoa(unescape(encodeURIComponent(ck)));
+    const lDone   = lRecord.completed;
+    const cDone   = cRecord.completed;
+    const bothDone = lDone && cDone;
+    const anyDone  = lDone || cDone;
+    const safeId   = btoa(unescape(encodeURIComponent(advisor+month)));
+    const taskCount = lRecord.tasks.length;
+    const canAdd    = taskCount < MAX_TASKS;
+    const canRemove = taskCount > MIN_TASKS;
+
+    let liveTasksHTML = "";
+    lRecord.tasks.forEach((t, idx) => {
+      liveTasksHTML += `
+        <div class="live-task-item">
+          <div class="live-task-item-header">
+            <span class="live-task-num">Task ${idx+1}</span>
+            ${canRemove ? `<button class="live-task-remove" onclick="removeLiveTask('${lSafe}',${idx})">✕</button>` : ""}
+          </div>
+          <div class="live-task-fields">
+            <div class="live-task-field" style="flex:2;min-width:140px;">
+              <label>📋 Task Name</label>
+              <input class="live-task-input" type="text" placeholder="e.g. Product review, Goal setting..."
+                value="${(t.name||"").replace(/"/g,'&quot;')}"
+                onclick="event.stopPropagation()"
+                oninput="setLiveTask('${lSafe}',${idx},'name',this.value)" />
+            </div>
+            <div class="live-task-field" style="flex:2;min-width:140px;">
+              <label>📝 Notes</label>
+              <textarea class="live-task-input live-task-notes" rows="2" placeholder="e.g. Follow-up needed..."
+                onclick="event.stopPropagation()"
+                oninput="setLiveTask('${lSafe}',${idx},'notes',this.value)">${t.notes||""}</textarea>
+            </div>
+          </div>
+        </div>`;
+    });
+
+    const card = document.createElement("div");
+    card.className = "advisor-card";
+    card.innerHTML = `
+      <div class="advisor-card-header">
+        <div class="advisor-name">👤 ${advisor}</div>
+        <div class="advisor-badge ${bothDone?"complete":anyDone?"partial":""}" id="badge-${safeId}">
+          ${bothDone?"✓ Complete":anyDone?"In Progress":"Pending"}
+        </div>
+      </div>
+      <div class="task-block ${lDone?"done":""}" id="block-${lSafe}">
+        <div class="task-main" onclick="toggleTask('${lSafe}')">
+          <div class="task-left">
+            <div class="task-icon">🎥</div>
+            <div class="task-info">
+              <div class="task-name">Live Session</div>
+              <div class="task-mgr">${manager}</div>
+            </div>
+          </div>
+          <div class="task-toggle" id="toggle-${lSafe}">${lDone?"✓":""}</div>
+        </div>
+        <div class="task-meta">
+          <div class="meta-field">
+            <label>📅 Date Completed</label>
+            <input class="meta-input" type="date" value="${lRecord.date||""}"
+              onclick="event.stopPropagation()"
+              onchange="setField('${lSafe}','date',this.value)" />
+          </div>
+          <div class="meta-field" style="flex:2;min-width:160px;">
+            <label>📝 Session Notes</label>
+            <textarea class="meta-input meta-notes" rows="2" placeholder="e.g. Rescheduled, No show..."
+              onclick="event.stopPropagation()"
+              oninput="setField('${lSafe}','notes',this.value)">${lRecord.notes||""}</textarea>
+          </div>
+        </div>
+        <div class="live-tasks-section">
+          <div class="live-tasks-header">
+            <span class="live-tasks-title">📋 Tasks Completed During Session
+              <span class="live-tasks-count">(${taskCount}/${MAX_TASKS} max · min ${MIN_TASKS})</span>
+            </span>
+            ${canAdd ? `<button class="btn btn-blue btn-sm" onclick="addLiveTask('${lSafe}')">+ Add Task</button>` : `<span style="font-size:0.72rem;color:#6e6e73;">Max ${MAX_TASKS} reached</span>`}
+          </div>
+          <div id="live-tasks-${lSafe}">${liveTasksHTML}</div>
+        </div>
+      </div>
+      <div class="task-block ${cDone?"done":""}" id="block-${cSafe}">
+        <div class="task-main" onclick="toggleTask('${cSafe}')">
+          <div class="task-left">
+            <div class="task-icon">⭐</div>
+            <div class="task-info">
+              <div class="task-name">Campaign Northstar</div>
+              <div class="task-mgr">${manager}</div>
+            </div>
+          </div>
+          <div class="task-toggle" id="toggle-${cSafe}">${cDone?"✓":""}</div>
+        </div>
+        <div class="task-meta">
+          <div class="meta-field">
+            <label>📅 Date Completed</label>
+            <input class="meta-input" type="date" value="${cRecord.date||""}"
+              onclick="event.stopPropagation()"
+              onchange="setField('${cSafe}','date',this.value)" />
+          </div>
+          <div class="meta-field" style="flex:2;min-width:150px;">
+            <label>🏷️ Campaign Name</label>
+            <input class="meta-input meta-campaign" type="text" placeholder="e.g. Spring Promo, Q3 Launch..."
+              value="${(cRecord.campaignName||"").replace(/"/g,'&quot;')}"
+              onclick="event.stopPropagation()"
+              oninput="setField('${cSafe}','campaignName',this.value)" />
+          </div>
+          <div class="meta-field" style="flex:2;min-width:150px;">
+            <label>📝 Notes</label>
+            <textarea class="meta-input meta-notes" rows="2" placeholder="e.g. Rescheduled, Follow-up needed..."
+              onclick="event.stopPropagation()"
+              oninput="setField('${cSafe}','notes',this.value)">${cRecord.notes||""}</textarea>
+          </div>
+        </div>
+      </div>
+      <div class="advisor-progress">
+        <div class="prog-label">
+          <span>Overall Progress</span>
+          <span id="plabel-${safeId}">${(lDone?1:0)+(cDone?1:0)}/2</span>
+        </div>
+        <div class="prog-bar"><div class="prog-fill" id="pfill-${safeId}" style="width:${((lDone?1:0)+(cDone?1:0))/2*100}%"></div></div>
+      </div>`;
+    container.appendChild(card);
+  }
+}
+
+function decodeKey(safeKey) { return decodeURIComponent(escape(atob(safeKey))); }
+
+function toggleTask(safeKey) {
+  const key = decodeKey(safeKey);
+  data[key].completed = !data[key].completed;
+  if (data[key].completed && !data[key].date) {
+    data[key].date = new Date().toISOString().split("T")[0];
+    const di = document.querySelector(`#block-${safeKey} input[type="date"]`);
+    if (di) di.value = data[key].date;
+  }
+  saveData();
+  document.getElementById(`block-${safeKey}`)?.classList.toggle("done", data[key].completed);
+  const tog = document.getElementById(`toggle-${safeKey}`);
+  if (tog) tog.textContent = data[key].completed ? "✓" : "";
+  updateAdvisorBadge(key);
+}
+
+function setField(safeKey, field, val) {
+  const key = decodeKey(safeKey);
+  data[key][field] = val;
+  saveData();
+}
+
+function setLiveTask(safeKey, idx, field, val) {
+  const key = decodeKey(safeKey);
+  if (!data[key].tasks[idx]) data[key].tasks[idx] = {name:"",notes:""};
+  data[key].tasks[idx][field] = val;
+  saveData();
+}
+
+function addLiveTask(safeKey) {
+  const key = decodeKey(safeKey);
+  if (data[key].tasks.length >= MAX_TASKS) return;
+  data[key].tasks.push({name:"",notes:""});
+  saveData(); renderTracker();
+}
+
+function removeLiveTask(safeKey, idx) {
+  const key = decodeKey(safeKey);
+  if (data[key].tasks.length <= MIN_TASKS) return;
+  data[key].tasks.splice(idx, 1);
+  saveData(); renderTracker();
+}
+
+function updateAdvisorBadge(key) {
+  const parts = key.split("||");
+  const advisor=parts[0], manager=parts[1], month=parts[3];
+  const lDone = data[makeKey(advisor,manager,"Live Session",month)]?.completed || false;
+  const cDone = data[makeKey(advisor,manager,"Campaign Northstar",month)]?.completed || false;
+  const safeId = btoa(unescape(encodeURIComponent(advisor+month)));
+  const badge = document.getElementById(`badge-${safeId}`);
+  const pfill = document.getElementById(`pfill-${safeId}`);
+  const plbl  = document.getElementById(`plabel-${safeId}`);
+  if (badge) { badge.textContent=(lDone&&cDone)?"✓ Complete":(lDone||cDone)?"In Progress":"Pending"; badge.className=`advisor-badge ${(lDone&&cDone)?"complete":(lDone||cDone)?"partial":""}`; }
+  if (pfill) pfill.style.width=`${((lDone?1:0)+(cDone?1:0))/2*100}%`;
+  if (plbl)  plbl.textContent=`${(lDone?1:0)+(cDone?1:0)}/2`;
+}
+
+// ── SYNC ─────────────────────────────────────────────────────────────────────
+function generateCode() {
+  const who = currentManager();
+  const myData = {};
+  for (const m of MONTHS) for (const a of ADVISORS) for (const t of TASKS) { const k=makeKey(a,who,t,m); myData[k]=data[k]; }
+  document.getElementById("myCodeBox").textContent = btoa(unescape(encodeURIComponent(JSON.stringify({manager:who,data:myData,ts:Date.now()}))));
+}
+function copyCode() {
+  const code = document.getElementById("myCodeBox").textContent;
+  if (!code||code.startsWith("Click")) { showAlert("copyAlert","error","⚠️ Generate your code first!"); return; }
+  navigator.clipboard.writeText(code).then(()=>showAlert("copyAlert","success","✅ Copied! Send this to Paul Palmer.")).catch(()=>showAlert("copyAlert","error","❌ Could not auto-copy — please select the code manually."));
+}
+function mergeCode() {
+  const raw = document.getElementById("pasteBox").value.trim();
+  if (!raw) { showAlert("mergeAlert","error","⚠️ Please paste a sync code first."); return; }
+  try {
+    const parsed = JSON.parse(decodeURIComponent(escape(atob(raw))));
+    if (!parsed.manager||!parsed.data) throw new Error();
+    let count=0;
+    for (const [k,v] of Object.entries(parsed.data)) { data[k]=v; count++; }
+    saveData();
+    showAlert("mergeAlert","success",`✅ Merged ${count} entries from ${parsed.manager}! Head to the Dashboard tab.`);
+    renderTracker();
+  } catch(e) { showAlert("mergeAlert","error","❌ Invalid code — make sure you pasted the full code."); }
+}
+function showAlert(id, type, msg) {
+  const el = document.getElementById(id);
+  el.className=`alert ${type}`; el.textContent=msg;
+  setTimeout(()=>{ el.style.display="none"; el.className="alert"; },5000);
+}
+
+// ── EXPORT ────────────────────────────────────────────────────────────────────
+function exportCSV() {
+  let csv = "Advisor,Manager,Month,Task Type,Completed,Date Completed,Campaign Name,Notes,Session Task #,Session Task Name,Session Task Notes\n";
+  for (const m of MONTHS) for (const a of ADVISORS) for (const mg of MANAGERS) {
+    const lk=makeKey(a,mg,"Live Session",m); const l=data[lk]||emptyLiveSession();
+    (l.tasks||[]).forEach((t,idx)=>{ csv+=`"${a}","${mg}","${m}","Live Session",${l.completed?1:0},"${l.date||""}","","${(l.notes||"").replace(/"/g,"'")}",${idx+1},"${(t.name||"").replace(/"/g,"'")}","${(t.notes||"").replace(/"/g,"'")}"\n`; });
+    const ck=makeKey(a,mg,"Campaign Northstar",m); const c=data[ck]||emptyCampaign();
+    csv+=`"${a}","${mg}","${m}","Campaign Northstar",${c.completed?1:0},"${c.date||""}","${(c.campaignName||"").replace(/"/g,"'")}","${(c.notes||"").replace(/"/g,"'")}","","",""\n`;
+  }
+  const a=document.createElement("a");
+  a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(csv);
+  a.download="Task_Completion_Q3_2026_Combined.csv"; a.click();
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────────────────────
+const charts = {};
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+function getFiltered() {
+  const m=document.getElementById("dashMonth").value;
+  const mg=document.getElementById("dashManager").value;
+  const rows=[];
+  for (const month of MONTHS) {
+    if (m!=="all"&&month!==m) continue;
+    for (const advisor of ADVISORS) for (const manager of MANAGERS) {
+      if (mg!=="all"&&manager!==mg) continue;
+      for (const task of TASKS) {
+        const d=data[makeKey(advisor,manager,task,month)]||{completed:false};
+        rows.push({advisor,manager,task,month,completed:d.completed});
+      }
+    }
+  }
+  return rows;
+}
+
+function renderDashboard() {
+  const d = getFiltered();
+  renderKPIs(d); renderMonthlyBar(d); renderTaskChart(d); renderTrend(); renderPie(d); renderEvalTable();
+}
+
+function renderKPIs(d) {
+  const col=d.filter(r=>r.manager==="Colette");
+  const pau=d.filter(r=>r.manager==="Paul Palmer");
+  const pct=(a,b)=>b?Math.round(a/b*100):0;
+  const cD=col.filter(r=>r.completed).length, pD=pau.filter(r=>r.completed).length, tD=d.filter(r=>r.completed).length;
+  const m=document.getElementById("dashMonth").value;
+  const mg=document.getElementById("dashManager").value;
+  // Only count tasks that have an actual name entered
+  let totalEvals=0;
+  for (const month of MONTHS) { if (m!=="all"&&month!==m) continue;
+    for (const a of ADVISORS) for (const manager of MANAGERS) { if (mg!=="all"&&manager!==mg) continue;
+      const lk=makeKey(a,manager,"Live Session",month);
+      totalEvals += (data[lk]?.tasks||[]).filter(t=>t.name&&t.name.trim()!=="").length;
+    }
+  }
+  document.getElementById("kpiRow").innerHTML=`
+    <div class="kpi c"><div class="val">${pct(cD,col.length)}%</div><div class="lbl">Colette Rate</div></div>
+    <div class="kpi c"><div class="val">${cD}/${col.length}</div><div class="lbl">Colette Done</div></div>
+    <div class="kpi m"><div class="val">${pct(pD,pau.length)}%</div><div class="lbl">Paul Palmer Rate</div></div>
+    <div class="kpi m"><div class="val">${pD}/${pau.length}</div><div class="lbl">Paul Palmer Done</div></div>
+    <div class="kpi g"><div class="val">${pct(tD,d.length)}%</div><div class="lbl">Overall Q3</div></div>
+    <div class="kpi g"><div class="val">${totalEvals}</div><div class="lbl">Task Evaluations</div></div>
+  `;
+}
+
+function renderMonthlyBar(d) {
+  destroyChart("monthlyBar");
+  const labels=MONTHS.map(m=>m.replace(" 2026",""));
+  const cD=MONTHS.map(m=>d.filter(r=>r.month===m&&r.manager==="Colette"&&r.completed).length);
+  const pD=MONTHS.map(m=>d.filter(r=>r.month===m&&r.manager==="Paul Palmer"&&r.completed).length);
+  charts["monthlyBar"]=new Chart(document.getElementById("monthlyBar").getContext("2d"),{
+    type:"bar",data:{labels,datasets:[
+      {label:"Colette",data:cD,backgroundColor:"#5e81f4",borderRadius:6},
+      {label:"Paul Palmer",data:pD,backgroundColor:"#f4a25e",borderRadius:6},
+      {label:"Target (8)",data:MONTHS.map(()=>8),type:"line",borderColor:"#ff3b30",borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:0}
+    ]},
+    options:{responsive:true,plugins:{legend:{position:"top"}},scales:{x:{grid:{display:false}},y:{beginAtZero:true,max:10,ticks:{stepSize:1},grid:{color:"#f0f0f0"}}}}
+  });
+}
+
+function renderTaskChart(d) {
+  destroyChart("taskChart");
+  charts["taskChart"]=new Chart(document.getElementById("taskChart").getContext("2d"),{
+    type:"bar",
+    data:{labels:MANAGERS,datasets:TASKS.map((t,i)=>({label:t,borderRadius:6,
+      data:MANAGERS.map(m=>d.filter(r=>r.manager===m&&r.task===t&&r.completed).length),
+      backgroundColor:i===0?"#5e81f4":"#34c759"}))},
+    options:{responsive:true,plugins:{legend:{position:"top"}},scales:{x:{grid:{display:false}},y:{beginAtZero:true,max:10,ticks:{stepSize:1},grid:{color:"#f0f0f0"}}}}
+  });
+}
+
+function renderTrend() {
+  destroyChart("trendChart");
+  const labels=MONTHS.map(m=>m.replace(" 2026",""));
+  const calc=mg=>MONTHS.map(m=>{
+    const rows=[];
+    for (const a of ADVISORS) for (const t of TASKS) { const k=makeKey(a,mg,t,m); if(data[k]) rows.push(data[k]); }
+    return rows.length?Math.round(rows.filter(r=>r.completed).length/rows.length*100):0;
+  });
+  charts["trendChart"]=new Chart(document.getElementById("trendChart").getContext("2d"),{
+    type:"line",data:{labels,datasets:[
+      {label:"Colette",data:calc("Colette"),borderColor:"#5e81f4",backgroundColor:"rgba(94,129,244,0.1)",tension:0.4,fill:true,pointRadius:5},
+      {label:"Paul Palmer",data:calc("Paul Palmer"),borderColor:"#f4a25e",backgroundColor:"rgba(244,162,94,0.1)",tension:0.4,fill:true,pointRadius:5}
+    ]},
+    options:{responsive:true,plugins:{legend:{position:"top"}},scales:{x:{grid:{display:false}},y:{beginAtZero:true,max:100,ticks:{callback:v=>v+"%"},grid:{color:"#f0f0f0"}}}}
+  });
+}
+
+function renderPie(d) {
+  destroyChart("pieChart");
+  const ls=d.filter(r=>r.task==="Live Session"&&r.completed).length;
+  const cn=d.filter(r=>r.task==="Campaign Northstar"&&r.completed).length;
+  const lsP=d.filter(r=>r.task==="Live Session"&&!r.completed).length;
+  const cnP=d.filter(r=>r.task==="Campaign Northstar"&&!r.completed).length;
+  charts["pieChart"]=new Chart(document.getElementById("pieChart").getContext("2d"),{
+    type:"doughnut",
+    data:{labels:["Live Session ✅","Campaign NS ✅","Live Session ⏳","Campaign NS ⏳"],
+      datasets:[{data:[ls,cn,lsP,cnP],backgroundColor:["#5e81f4","#34c759","#c7d3fc","#a8f0c0"],borderWidth:2,borderColor:"#fff"}]},
+    options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:11},padding:12}}},cutout:"60%"}
+  });
+}
+
+// ── TASK EVALUATIONS TABLE ────────────────────────────────────────────────────
+function renderEvalTable() {
+  const m  = document.getElementById("dashMonth").value;
+  const mg = document.getElementById("dashManager").value;
+  const months = m === "all" ? MONTHS : [m];
+  const wrap = document.getElementById("evalTableWrap");
+
+  // Determine which managers to show
+  const showColette = mg === "all" || mg === "Colette";
+  const showPaul    = mg === "all" || mg === "Paul Palmer";
+
+  let html = `<table class="eval-table"><thead><tr>
+    <th>Advisor</th>`;
+  if (showColette) html += `<th class="center">Colette<br><span style="font-weight:400;font-size:0.7rem;">Tasks Evaluated</span></th>`;
+  if (showPaul)    html += `<th class="center">Paul Palmer<br><span style="font-weight:400;font-size:0.7rem;">Tasks Evaluated</span></th>`;
+  html += `<th class="center">Total</th></tr></thead><tbody>`;
+
+  let grandColette = 0, grandPaul = 0;
+
+  for (const month of months) {
+    // Month group header
+    html += `<tr class="month-group-header"><td colspan="${1 + (showColette?1:0) + (showPaul?1:0) + 1}">📅 ${month}</td></tr>`;
+
+    for (const advisor of ADVISORS) {
+      // Only count tasks where a name has been entered
+      const colCount = showColette
+        ? (data[makeKey(advisor,"Colette","Live Session",month)]?.tasks||[]).filter(t=>t.name&&t.name.trim()!=="").length
+        : 0;
+      const paulCount = showPaul
+        ? (data[makeKey(advisor,"Paul Palmer","Live Session",month)]?.tasks||[]).filter(t=>t.name&&t.name.trim()!=="").length
+        : 0;
+      const total = colCount + paulCount;
+
+      grandColette += colCount;
+      grandPaul    += paulCount;
+
+      html += `<tr>
+        <td><strong>${advisor}</strong></td>`;
+      if (showColette) html += `<td class="center"><span class="count-badge ${colCount>0?"colette":"zero"}">${colCount}</span></td>`;
+      if (showPaul)    html += `<td class="center"><span class="count-badge ${paulCount>0?"paul":"zero"}">${paulCount}</span></td>`;
+      html += `<td class="center"><strong>${total}</strong></td></tr>`;
+    }
+  }
+
+  // Totals footer
+  const grandTotal = grandColette + grandPaul;
+  html += `</tbody><tfoot><tr>
+    <td>Total</td>`;
+  if (showColette) html += `<td class="center">${grandColette}</td>`;
+  if (showPaul)    html += `<td class="center">${grandPaul}</td>`;
+  html += `<td class="center">${grandTotal}</td></tr></tfoot></table>`;
+
+  wrap.innerHTML = html;
+}
+
+initData();
+renderTracker();
+</script>
+</body>
+</html>
